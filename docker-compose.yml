@@ -1,6 +1,6 @@
 services:
   admin-panel:
-    image: ghcr.io/librechat-ai/librechat-admin-panel:latest
+    image: ${ADMIN_PANEL_IMAGE:-ghcr.io/godarai-ir/librechat-admin-panel:latest}
     ports:
       - '${PORT:-3000}:${PORT:-3000}'
     restart: unless-stopped
