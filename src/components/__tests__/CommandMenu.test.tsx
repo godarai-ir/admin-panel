@@ -18,6 +18,7 @@ vi.mock('@/hooks', async () => {
       options ? `${key}(${Object.values(options).join(',')})` : key,
     useSearchIndex: () => ({ items: [], loading: false }),
     useReturnFocus,
+    useLanguage: () => ({ language: 'en', direction: 'ltr', setLanguage: vi.fn() }),
   };
 });
 

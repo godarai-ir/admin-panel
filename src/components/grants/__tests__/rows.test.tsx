@@ -10,6 +10,7 @@ import { GrantTableRow } from '../GrantTableRow';
 vi.mock('@/hooks', () => ({
   useLocalize: () => (key: string, options?: Record<string, string | number>) =>
     options ? `${key}(${Object.values(options).join(',')})` : key,
+  useLanguage: () => ({ language: 'en', direction: 'ltr', setLanguage: vi.fn() }),
 }));
 
 const PRINCIPAL: t.PrincipalRow = {
