@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 env:
-  IMAGE: ghcr.io/librechat-ai/librechat-admin-panel
+  IMAGE: ghcr.io/godarai-ir/librechat-admin-panel
 
 jobs:
   prepare:
