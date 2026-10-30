@@ -149,7 +149,7 @@ import type { ConfigValue, SchemaField, FlatConfigMap, ConfigScope } from '@/typ
   - `@/hooks` for all custom hooks
   - `@/utils` for `cn`, `formatJson`, `getInitials`, etc.
   - `@/components/shared` for shared UI components
-- **Barrel imports for `@/server` and `@/components`:** Import from the barrel path, not from sub-files (exception: `@/server/session` and `@/server/utils/api` are server-only and excluded from the barrel):
+- **Barrel imports for `@/server` and `@/components`:** Import from the barrel path, not from sub-files (exception: `@/server/session`, `@/server/utils/api` and `@/server/tenancy` are server-only and excluded from the barrel):
 
 ```typescript
 // RIGHT
@@ -245,3 +245,7 @@ Fix all formatting lint errors (trailing spaces, tabs, newlines, indentation) us
   contain no-op stubs with `// TODO: apiFetch(...)` comments. Will be wired to the
   LibreChat Admin API once endpoints are available.
 - **`SystemCapabilities`** (from `@librechat/data-schemas`) for capability constants — not a local enum.
+- **Host multi-tenancy:** with `MULTI_TENANT_MODE=host` the tenant is the slug of the panel's own `Host`
+  (`<slug>.<ADMIN_HOST_BASE_DOMAIN>`, `src/server/tenancy/host.ts`). Every call to LibreChat goes through
+  `upstreamFetch` (`src/server/tenancy/upstream.ts`), which sets `Host: <slug>.<TENANT_HOST_BASE_DOMAIN>`;
+  never call `fetch` on `getServerApiUrl()` directly.

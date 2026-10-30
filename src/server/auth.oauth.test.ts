@@ -636,8 +636,8 @@ describe('ssoProvidersFn', () => {
       providers: [{ id: 'openid', label: 'Continue with OpenID' }, { id: 'google' }],
       ssoOnly: false,
     });
-    expect(fetchMock).toHaveBeenCalledWith(OPENID_CHECK_URL, { headers: {} });
-    expect(fetchMock).toHaveBeenCalledWith(STARTUP_CONFIG_URL, { headers: {} });
+    expect(fetchMock).toHaveBeenCalledWith(OPENID_CHECK_URL, {});
+    expect(fetchMock).toHaveBeenCalledWith(STARTUP_CONFIG_URL, {});
   });
 
   it('offers Google without OpenID, whose client did not initialise', async () => {

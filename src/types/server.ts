@@ -18,6 +18,8 @@ export interface SessionData {
   ssoProvider?: SsoProviderId;
   /** The in-app path an SSO sign-in started from, for its callback to return to. */
   ssoRedirect?: string;
+  /** Host mode: the tenant slug the session was issued on; another tenant's host drops it. */
+  tenantSlug?: string;
 }
 
 /** What the `admin-session` cookie seals: the envelope TanStack Start's former `useSession` (h3) wrote. */

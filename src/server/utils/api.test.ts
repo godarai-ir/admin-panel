@@ -8,6 +8,8 @@ vi.mock('./refresh', () => ({
   refreshOn401: (...args: unknown[]) => refreshOn401(...args),
 }));
 
+vi.mock('@tanstack/react-start/server', () => ({ getRequestHeader: () => undefined }));
+
 import { apiFetch } from './api';
 
 const fetchMock = vi.fn();

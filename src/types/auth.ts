@@ -68,6 +68,9 @@ export interface SsoProviders {
  */
 export type AuthErrorCode =
   | 'tenant_required'
+  | 'tenant_unknown'
+  | 'tenant_suspended'
+  | 'tenant_unavailable'
   | 'not_admin'
   | 'federated_login'
   | 'invalid_credentials'

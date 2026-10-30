@@ -1,6 +1,7 @@
 import type * as t from '@/types';
 import { ensureFreshBearer, refreshOn401 } from './refresh';
-import { getApiBaseUrl, getServerApiUrl } from './url';
+import { upstreamFetch } from '../tenancy/upstream';
+import { getApiBaseUrl } from './url';
 import { TERMS_NOT_ACCEPTED_CODE } from '@/constants';
 import { describeApiError } from '@/utils';
 
@@ -25,7 +26,6 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     throw new Error('No admin session token available');
   }
 
-  const url = `${getServerApiUrl()}${path}`;
   const buildInit = (token: string): RequestInit => ({
     ...init,
     headers: {
@@ -35,7 +35,7 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     },
   });
 
-  const response = await fetch(url, buildInit(initialToken));
+  const response = await upstreamFetch(path, buildInit(initialToken));
   if (response.status !== 401) {
     return response;
   }
@@ -44,7 +44,7 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   if (!refreshedToken) {
     return response;
   }
-  return fetch(url, buildInit(refreshedToken));
+  return upstreamFetch(path, buildInit(refreshedToken));
 }
 
 /**

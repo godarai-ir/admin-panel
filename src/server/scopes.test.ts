@@ -34,6 +34,7 @@ vi.mock('./utils/api', () => ({
 }));
 
 vi.mock('@tanstack/react-start', () => ({
+  createServerOnlyFn: <T>(fn: T): T => fn,
   createServerFn: () => ({
     validator: () => ({ handler: (fn: (...args: unknown[]) => unknown) => fn }),
     handler: (fn: (...args: unknown[]) => unknown) => fn,
