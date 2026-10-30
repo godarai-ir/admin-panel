@@ -20,8 +20,12 @@ concurrency:
 permissions:
   contents: read
 
+# Published beside the other GodarAI images in the shared docker.io/delpak/godar-ai repository,
+# so every tag carries the admin-panel- prefix: admin-panel-vX.Y.Z for releases and
+# admin-panel-sha-<commit> for main, matching the <service>- tags the Shahrah chart pulls.
 env:
-  IMAGE: ghcr.io/godarai-ir/librechat-admin-panel
+  IMAGE: docker.io/delpak/godar-ai
+  TAG_PREFIX: admin-panel-
 
 jobs:
   prepare:
@@ -41,10 +45,8 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: latest=false
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha,format=long,prefix=,enable={{is_default_branch}}
+            type=semver,pattern=v{{version}},prefix=${{ env.TAG_PREFIX }}
+            type=sha,format=long,prefix=${{ env.TAG_PREFIX }}sha-,enable={{is_default_branch}}
 
       - name: Refuse a publishing run without tags
         if: github.event_name != 'workflow_dispatch' && steps.meta.outputs.tags == ''
@@ -57,9 +59,6 @@ jobs:
     needs: prepare
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     timeout-minutes: 30
-    permissions:
-      contents: read
-      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -72,13 +71,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to Docker Hub
         if: needs.prepare.outputs.publish == 'true'
         uses: docker/login-action@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push by digest
         id: build
@@ -118,9 +116,6 @@ jobs:
     if: needs.prepare.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout
@@ -151,12 +146,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Create the manifest list and push its tags
         env:
@@ -179,7 +173,7 @@ jobs:
             echo "No tags to publish; refusing to push an untagged manifest list." >&2
             exit 1
           fi
-          if [ "$LATEST" = true ]; then tag_args+=(-t "$IMAGE:latest"); fi
+          if [ "$LATEST" = true ]; then tag_args+=(-t "$IMAGE:${TAG_PREFIX}latest"); fi
           docker buildx imagetools create "${tag_args[@]}" "${digests[@]/#/$IMAGE@sha256:}"
 
       - name: Inspect the image
