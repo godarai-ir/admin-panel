@@ -20,6 +20,7 @@ vi.mock('@/hooks', async () => {
     useCapabilities: () => ({ hasCapability: () => true }),
     useReturnFocus,
     useStripAriaExpanded,
+    useLanguage: () => ({ language: 'en', direction: 'ltr', setLanguage: vi.fn() }),
   };
 });
 

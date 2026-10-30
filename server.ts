@@ -2,6 +2,7 @@ import { Glob } from 'bun';
 import { join } from 'node:path';
 import { watchMemory, createRequestObserver, parseMemoryThresholdsMb } from './src/server/logging';
 import { metricsResponse } from './src/server/metrics';
+import { resolveHostTenancy, validateHostTenancy } from './src/server/tenancy/config';
 
 const CLIENT_DIR = join(import.meta.dir, 'dist', 'client');
 const SERVER_ENTRY = new URL('./dist/server/server.js', import.meta.url);
@@ -22,6 +23,14 @@ if (env.NODE_ENV !== 'development') {
     );
     process.exit(1);
   }
+}
+
+const tenancyProblems = validateHostTenancy(resolveHostTenancy(env), env);
+if (tenancyProblems.length > 0) {
+  console.error(
+    `[admin-panel] Invalid host multi-tenancy configuration. Refusing to start:\n- ${tenancyProblems.join('\n- ')}`,
+  );
+  process.exit(1);
 }
 
 const ONE_DAY = 86400;

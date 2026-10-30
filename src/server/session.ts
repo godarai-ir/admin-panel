@@ -4,6 +4,7 @@ import { createServerOnlyFn } from '@tanstack/react-start';
 import { deleteCookie, getCookie, getRequest, setCookie } from '@tanstack/react-start/server';
 import type * as t from '@/types';
 import { planChunkedCookie, readChunkedCookie } from './utils/cookies';
+import { resolveRequestTenant } from './tenancy/host';
 
 const DEV_SECRET = 'dev-only-session-secret-minimum-32-chars!';
 
@@ -94,11 +95,23 @@ async function writeSession(record: t.SessionRecord, settings: t.SessionSettings
   }
 }
 
-/** The request's sealed session, or a new one whose cookie is issued right away. */
-async function loadSession(settings: t.SessionSettings): Promise<t.SessionRecord> {
+/**
+ * The request's sealed session, or a new one whose cookie is issued right away.
+ * Host mode: a session belongs to the tenant it was issued on, so one sealed for
+ * another tenant (a cookie carried over by a misconfigured proxy or `Domain`)
+ * is replaced, never read.
+ */
+async function loadSession(
+  settings: t.SessionSettings,
+  tenantSlug: string | undefined,
+): Promise<t.SessionRecord> {
   const existing = await readSession(settings.password);
-  if (existing) return existing;
-  const record: t.SessionRecord = { id: crypto.randomUUID(), createdAt: Date.now(), data: {} };
+  if (existing && existing.data.tenantSlug === tenantSlug) return existing;
+  const record: t.SessionRecord = {
+    id: crypto.randomUUID(),
+    createdAt: Date.now(),
+    data: tenantSlug ? { tenantSlug } : {},
+  };
   await writeSession(record, settings);
   return record;
 }
@@ -139,7 +152,8 @@ export const useAppSession = createServerOnlyFn(async (): Promise<t.SessionManag
     cookie: resolveCookieOptions(),
   };
   const request = getRequest();
-  const pending = requestSessions.get(request) ?? loadSession(settings);
+  const pending =
+    requestSessions.get(request) ?? loadSession(settings, resolveRequestTenant()?.slug);
   requestSessions.set(request, pending);
   const record = await pending;
 

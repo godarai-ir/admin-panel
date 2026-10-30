@@ -8,15 +8,16 @@ import {
   SSO_PROVIDERS,
   SSO_PROVIDER_IDS,
   EXCHANGE_CODE_PATTERN,
+  TENANT_REFUSAL_CODES,
   TENANT_CONTEXT_REQUIRED_CODE,
   TWO_FACTOR_FEDERATED_LOGIN_BLOCKED_CODE,
 } from '@/constants';
 import { offeredSsoProviders, toSafeRedirect, ssoStartPath } from '@/utils';
-import { getApiBaseUrl, getServerApiUrl } from './utils/url';
+import { getApiBaseUrl } from './utils/url';
 import { refreshAdminTokenDeduped } from './utils/refresh';
 import { buildOAuthExchangePayload } from './utils/oauth';
 import { useAppSession, getSessionConfig } from './session';
-import { tenantHeaders } from './utils/tenant';
+import { resolveRequestTenant, upstreamFetch } from './tenancy';
 
 /** Extract a named cookie value from `set-cookie` response headers. */
 function extractCookieValue(response: Response, name: string): string | undefined {
@@ -86,12 +87,19 @@ function forbiddenCode(body: t.AuthErrorBody, fallback: t.AuthErrorCode): t.Auth
   return (body.code ? FORBIDDEN_ERROR_CODES.get(body.code) : undefined) ?? fallback;
 }
 
+/** The failure a host-mode tenant refusal names, whatever its status; `undefined` for any other reply. */
+function tenantRefusal(body: t.AuthErrorBody): t.AuthErrorCode | undefined {
+  return body.code ? TENANT_REFUSAL_CODES.get(body.code) : undefined;
+}
+
 /**
  * Why `POST /api/admin/login/local` refused. LibreChat's `requireLocalAuth`
  * answers 404 for an unknown email and a wrong password alike, and 422 only
  * for an unverified email.
  */
 function loginFailureCode(status: number, body: t.AuthErrorBody): t.AuthErrorCode {
+  const refusal = tenantRefusal(body);
+  if (refusal) return refusal;
   switch (status) {
     case 403:
       return forbiddenCode(body, 'not_admin');
@@ -108,6 +116,8 @@ function loginFailureCode(status: number, body: t.AuthErrorBody): t.AuthErrorCod
 
 /** Why `POST /api/auth/2fa/verify-temp` refused: a 401 says whether the temp token expired or the code was wrong. */
 function verifyTempFailureCode(status: number, body: t.AuthErrorBody): t.AuthErrorCode {
+  const refusal = tenantRefusal(body);
+  if (refusal) return refusal;
   if (status === 401) {
     const message = typeof body.message === 'string' ? body.message : '';
     return message.toLowerCase().includes('expired') ? 'totp_expired' : 'totp_invalid';
@@ -125,7 +135,9 @@ const EXCHANGE_ERROR_CODES: ReadonlyMap<string, t.AuthErrorCode> = new Map([
 
 /** Why `POST /api/admin/oauth/exchange` refused (its `error_code`, else the status). */
 function exchangeFailureCode(status: number, body: t.AuthErrorBody): t.AuthErrorCode {
-  const known = body.error_code ? EXCHANGE_ERROR_CODES.get(body.error_code) : undefined;
+  const known =
+    (body.error_code ? EXCHANGE_ERROR_CODES.get(body.error_code) : undefined) ??
+    tenantRefusal(body);
   if (known) return known;
   if (status === 429) return 'rate_limited';
   if (status === 403) return forbiddenCode(body, 'not_admin');
@@ -141,9 +153,9 @@ export const adminLoginFn = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }): Promise<t.AdminLoginResult> => {
     try {
-      const response = await fetch(`${getServerApiUrl()}/api/admin/login/local`, {
+      const response = await upstreamFetch('/api/admin/login/local', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...tenantHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
@@ -188,9 +200,9 @@ export const adminVerify2FAFn = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }): Promise<t.AuthResult> => {
     try {
-      const response = await fetch(`${getServerApiUrl()}/api/auth/2fa/verify-temp`, {
+      const response = await upstreamFetch('/api/auth/2fa/verify-temp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...tenantHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tempToken: data.tempToken, token: data.totpCode }),
       });
 
@@ -199,7 +211,7 @@ export const adminVerify2FAFn = createServerFn({ method: 'POST' })
       }
 
       const verifyData = (await response.json()) as t.TwoFAVerifyResponse;
-      const adminVerifyResponse = await fetch(`${getServerApiUrl()}/api/admin/verify`, {
+      const adminVerifyResponse = await upstreamFetch('/api/admin/verify', {
         headers: { Authorization: `Bearer ${verifyData.token}` },
       });
 
@@ -263,7 +275,7 @@ export const verifyAdminTokenFn = createServerFn({ method: 'GET' }).handler(asyn
 
     if (needsRevalidation) {
       try {
-        const response = await fetch(`${getServerApiUrl()}/api/admin/verify`, {
+        const response = await upstreamFetch('/api/admin/verify', {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -288,7 +300,7 @@ export const verifyAdminTokenFn = createServerFn({ method: 'GET' }).handler(asyn
                   lastActivity: now,
                 };
                 try {
-                  const reVerify = await fetch(`${getServerApiUrl()}/api/admin/verify`, {
+                  const reVerify = await upstreamFetch('/api/admin/verify', {
                     headers: { Authorization: `Bearer ${refreshed.token}` },
                   });
                   if (reVerify.ok) {
@@ -360,7 +372,7 @@ export const adminLogoutFn = createServerFn({ method: 'POST' }).handler(async ()
     let redirect: string | undefined;
     if (token) {
       try {
-        const response = await fetch(`${getServerApiUrl()}/api/auth/logout`, {
+        const response = await upstreamFetch('/api/auth/logout', {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -397,9 +409,9 @@ export const getCurrentUserFn = createServerFn({ method: 'GET' }).handler(async 
 
 /** LibreChat's `GET /api/config`, read with the request's tenant; `undefined` when it cannot be read. */
 async function fetchSsoStartupConfig(): Promise<t.SsoStartupConfig | undefined> {
-  const configUrl = `${getServerApiUrl()}/api/config`;
+  const configUrl = '/api/config';
   try {
-    const response = await fetch(configUrl, { headers: tenantHeaders() });
+    const response = await upstreamFetch(configUrl);
     if (!response.ok) {
       console.warn('[ssoProvidersFn] Startup config request failed:', response.status, configUrl);
       return undefined;
@@ -417,9 +429,9 @@ async function fetchSsoStartupConfig(): Promise<t.SsoStartupConfig | undefined> 
  * does only once its client initialised, which `GET /api/config` cannot tell.
  */
 async function checkSsoProvider(id: t.SsoProviderId): Promise<boolean> {
-  const checkUrl = `${getServerApiUrl()}${ssoStartPath(id)}/check`;
+  const checkUrl = `${ssoStartPath(id)}/check`;
   try {
-    const response = await fetch(checkUrl, { headers: tenantHeaders() });
+    const response = await upstreamFetch(checkUrl);
     if (!response.ok) {
       console.warn(`[ssoProvidersFn] ${id} check failed:`, response.status, checkUrl);
     }
@@ -515,11 +527,10 @@ export const oauthExchangeFn = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }): Promise<t.SsoExchangeResult> => {
     try {
-      const requestOrigin = getRequestOrigin();
+      const requestOrigin = resolveRequestTenant()?.adminOrigin ?? getRequestOrigin();
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...(requestOrigin ? { Origin: requestOrigin } : {}),
-        ...tenantHeaders(),
       };
 
       const session = await useAppSession();
@@ -531,7 +542,7 @@ export const oauthExchangeFn = createServerFn({ method: 'POST' })
         return failure('sso_verifier_lost');
       }
 
-      const response = await fetch(`${getServerApiUrl()}/api/admin/oauth/exchange`, {
+      const response = await upstreamFetch('/api/admin/oauth/exchange', {
         method: 'POST',
         headers,
         body: exchangeBody,

@@ -13,9 +13,28 @@ export const TENANT_CONTEXT_REQUIRED_CODE = 'TENANT_CONTEXT_REQUIRED';
  */
 export const TWO_FACTOR_FEDERATED_LOGIN_BLOCKED_CODE = 'TWO_FACTOR_FEDERATED_LOGIN_BLOCKED';
 
+/** The panel's own `code` for a host-mode panel host that names no tenant (`upstreamFetch`). */
+export const TENANT_HOST_UNKNOWN_CODE = 'TENANT_HOST_UNKNOWN';
+
+/**
+ * The failure each tenant refusal of LibreChat's host multi-tenancy names: a
+ * host no tenant answers to, a tenant without an admin panel origin, a
+ * suspended tenant, or one whose registry entry cannot serve sign-in.
+ */
+export const TENANT_REFUSAL_CODES: ReadonlyMap<string, t.AuthErrorCode> = new Map([
+  [TENANT_HOST_UNKNOWN_CODE, 'tenant_unknown'],
+  ['ADMIN_PANEL_DISABLED', 'tenant_unknown'],
+  ['TENANT_SUSPENDED', 'tenant_suspended'],
+  ['TENANT_MISCONFIGURED', 'tenant_unavailable'],
+  ['TENANT_REGISTRY_UNAVAILABLE', 'tenant_unavailable'],
+]);
+
 /** The phrase of each sign-in failure. */
 export const AUTH_ERROR_KEYS: Readonly<Record<t.AuthErrorCode, string>> = {
   tenant_required: 'com_auth_error_tenant_required',
+  tenant_unknown: 'com_auth_error_tenant_unknown',
+  tenant_suspended: 'com_auth_error_tenant_suspended',
+  tenant_unavailable: 'com_auth_error_tenant_unavailable',
   not_admin: 'com_auth_error_not_admin',
   federated_login: 'com_auth_error_federated_login',
   invalid_credentials: 'com_auth_error_invalid_credentials',

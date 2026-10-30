@@ -1,9 +1,8 @@
 import { z } from 'zod';
 import type * as t from '@/types';
-import { readTenantHeader, tenantHeaders } from './tenant';
+import { requestTenantKey, upstreamFetch } from '../tenancy/upstream';
 import { SSO_PROVIDERS } from '@/constants';
 import { useAppSession } from '../session';
-import { getServerApiUrl } from './url';
 
 const refreshResponseSchema = z.object({
   token: z.string(),
@@ -40,9 +39,9 @@ async function refreshSsoSession(
     console.warn(`[refreshAdminToken] ${provider} refresh requires user id; aborting`);
     return undefined;
   }
-  const response = await fetch(`${getServerApiUrl()}/api/admin/oauth/refresh`, {
+  const response = await upstreamFetch('/api/admin/oauth/refresh', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...tenantHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token: refreshToken, user_id: userId, provider }),
   });
   if (!response.ok) return undefined;
@@ -54,9 +53,9 @@ async function refreshSsoSession(
 async function refreshPasswordSession(
   refreshToken: string,
 ): Promise<RefreshedTokenset | undefined> {
-  const response = await fetch(`${getServerApiUrl()}/api/auth/refresh`, {
+  const response = await upstreamFetch('/api/auth/refresh', {
     method: 'POST',
-    headers: { Cookie: `refreshToken=${refreshToken}`, ...tenantHeaders() },
+    headers: { Cookie: `refreshToken=${refreshToken}` },
   });
   if (!response.ok) return undefined;
   const parsed = refreshResponseSchema.safeParse(await response.json());
@@ -73,8 +72,8 @@ async function refreshPasswordSession(
  *   its bearer, never on the password route.
  * - `librechat` sessions hit the cookie-based `/api/auth/refresh`.
  *
- * Both forward the deployment's `X-Tenant-Id` header (`tenantHeaders`) so the
- * backend's `preAuthTenantMiddleware` scopes the user lookup correctly.
+ * Both carry the request's tenant (`upstreamFetch`) so the backend scopes
+ * the user lookup to it.
  *
  * Returns `undefined` on any network or schema failure — callers decide
  * whether to clear the session.
@@ -100,7 +99,7 @@ const inFlight = new Map<string, Promise<RefreshedTokenset | undefined>>();
 
 /**
  * Build the dedupe key from every discriminator that the upstream refresh
- * actually depends on: token provider, user identity, tenant header, and the
+ * actually depends on: token provider, user identity, tenant, and the
  * refresh token itself. Keying on `refreshToken` alone would conflate two
  * concurrent calls that happen to share a token string but differ by user or
  * tenant — the second caller would receive the first caller's bearer and
@@ -110,9 +109,9 @@ function buildDedupeKey(
   refreshToken: string,
   tokenProvider: t.SessionData['tokenProvider'],
   userId: string | undefined,
-  tenantId: string | undefined,
+  tenantKey: string,
 ): string {
-  return [tokenProvider ?? '', userId ?? '', tenantId ?? '', refreshToken].join('\u0000');
+  return [tokenProvider ?? '', userId ?? '', tenantKey, refreshToken].join('\u0000');
 }
 
 /**
@@ -125,7 +124,7 @@ export function refreshAdminTokenDeduped(
   tokenProvider: t.SessionData['tokenProvider'],
   userId: string | undefined,
 ): Promise<RefreshedTokenset | undefined> {
-  const key = buildDedupeKey(refreshToken, tokenProvider, userId, readTenantHeader());
+  const key = buildDedupeKey(refreshToken, tokenProvider, userId, requestTenantKey());
   const existing = inFlight.get(key);
   if (existing) return existing;
   const pending = refreshAdminToken(refreshToken, tokenProvider, userId).finally(() => {

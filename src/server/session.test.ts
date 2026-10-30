@@ -23,6 +23,7 @@ const sealedRecordSchema = z.object({
 async function inRequest(
   cookies: string[],
   work: (session: t.SessionManager) => Promise<void> | void,
+  host = 'admin.test',
 ): Promise<string[]> {
   let setCookies: string[] = [];
   const entry = createServerEntry({
@@ -33,7 +34,7 @@ async function inRequest(
     },
   });
   const cookie = cookies.map((setCookie) => setCookie.split(';')[0]).join('; ');
-  await entry.fetch(new Request('http://admin.test/_serverFn/x', { headers: { cookie } }));
+  await entry.fetch(new Request(`http://${host}/_serverFn/x`, { headers: { cookie, host } }));
   return setCookies;
 }
 
@@ -171,6 +172,54 @@ describe('useAppSession', () => {
       data = { ...session.data };
     });
     expect(data).toEqual({});
+  });
+
+  describe('in host mode', () => {
+    beforeEach(() => {
+      vi.stubEnv('MULTI_TENANT_MODE', 'host');
+      vi.stubEnv('ADMIN_HOST_BASE_DOMAIN', 'admin.localhost');
+      vi.stubEnv('TENANT_HOST_BASE_DOMAIN', 'chat.localhost');
+    });
+
+    it('binds a new session to the tenant of the host it was issued on', async () => {
+      const setCookies = await inRequest(
+        [],
+        (session) => session.update({ token: 'jwt-tenant1' }),
+        'tenant1.admin.localhost:3010',
+      );
+
+      const record = await unsealWritten(setCookies);
+      expect(record.data).toEqual({ tenantSlug: 'tenant1', token: 'jwt-tenant1' });
+    });
+
+    it("keeps the session on its own tenant's host", async () => {
+      const issued = await inRequest(
+        [],
+        (session) => session.update({ token: 'jwt-tenant1' }),
+        'tenant1.admin.localhost',
+      );
+
+      let token: string | undefined;
+      await inRequest(issued, (session) => void (token = session.data.token), 'tenant1.admin.localhost');
+      expect(token).toBe('jwt-tenant1');
+    });
+
+    it("replaces a session sealed for another tenant instead of reading it", async () => {
+      const issued = await inRequest(
+        [],
+        (session) => session.update({ token: 'jwt-tenant1' }),
+        'tenant1.admin.localhost',
+      );
+
+      let data: t.SessionData | undefined;
+      const reissued = await inRequest(
+        issued,
+        (session) => void (data = { ...session.data }),
+        'tenant2.admin.localhost',
+      );
+      expect(data).toEqual({ tenantSlug: 'tenant2' });
+      expect((await unsealWritten(reissued)).data).toEqual({ tenantSlug: 'tenant2' });
+    });
   });
 
   it('shares one session between every reader and writer of a request', async () => {
