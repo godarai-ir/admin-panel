@@ -19,6 +19,12 @@ const navItems: t.NavItem[] = [
     icon: 'settings',
     capability: SystemCapabilities.READ_CONFIGS,
   },
+  {
+    labelKey: 'com_nav_branding',
+    path: '/branding',
+    icon: 'pencil',
+    capability: SystemCapabilities.MANAGE_CONFIGS,
+  },
   // TODO: re-enable once user management is ready
   // {
   //   labelKey: 'com_nav_users',

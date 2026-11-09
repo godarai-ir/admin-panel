@@ -1,4 +1,5 @@
 export * from './auth';
+export * from './branding';
 export * from './capabilities';
 export * from './catalog';
 export * from './config';
