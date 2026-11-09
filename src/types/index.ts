@@ -1,5 +1,6 @@
 export type * from './access';
 export type * from './auth';
+export type * from './branding';
 export type * from './catalog';
 export type * from './changes';
 export type * from './config';

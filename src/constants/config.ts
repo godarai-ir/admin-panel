@@ -95,9 +95,10 @@ export const READ_ONLY_CONFIG_SECTIONS: ReadonlyMap<string, t.ReadOnlyReason> = 
  * Tenant-wide sections with their own admin API (e.g. the Langfuse connection).
  * The generic config API strips them, so saves and imports never send them.
  */
-export const DEDICATED_CONFIG_SECTIONS: ReadonlySet<string> = new Set(
-  BASE_PRINCIPAL_CONFIG_SECTIONS,
-);
+export const DEDICATED_CONFIG_SECTIONS: ReadonlySet<string> = new Set<string>([
+  ...BASE_PRINCIPAL_CONFIG_SECTIONS,
+  'branding',
+]);
 
 /** AppService output names for config sections, mapped to their canonical config keys. */
 export const APP_SERVICE_KEY_ALIASES: Readonly<Record<string, string>> = {

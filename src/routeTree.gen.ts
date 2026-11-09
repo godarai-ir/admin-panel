@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccessRouteImport } from './routes/_app/access'
+import { Route as AppBrandingRouteImport } from './routes/_app/branding'
 import { Route as AppGrantsRouteImport } from './routes/_app/grants'
 import { Route as AppHelpRouteImport } from './routes/_app/help'
 import { Route as AppUsersRouteImport } from './routes/_app/users'
@@ -36,6 +37,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppAccessRoute = AppAccessRouteImport.update({
   id: '/access',
   path: '/access',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBrandingRoute = AppBrandingRouteImport.update({
+  id: '/branding',
+  path: '/branding',
   getParentRoute: () => AppRoute,
 } as any)
 const AppGrantsRoute = AppGrantsRouteImport.update({
@@ -68,6 +74,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/access': typeof AppAccessRoute
+  '/branding': typeof AppBrandingRoute
   '/grants': typeof AppGrantsRoute
   '/help': typeof AppHelpRoute
   '/users': typeof AppUsersRoute
@@ -77,6 +84,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/access': typeof AppAccessRoute
+  '/branding': typeof AppBrandingRoute
   '/grants': typeof AppGrantsRoute
   '/help': typeof AppHelpRoute
   '/users': typeof AppUsersRoute
@@ -89,6 +97,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/access': typeof AppAccessRoute
+  '/_app/branding': typeof AppBrandingRoute
   '/_app/grants': typeof AppGrantsRoute
   '/_app/help': typeof AppHelpRoute
   '/_app/users': typeof AppUsersRoute
@@ -102,6 +111,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/access'
+    | '/branding'
     | '/grants'
     | '/help'
     | '/users'
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/access'
+    | '/branding'
     | '/grants'
     | '/help'
     | '/users'
@@ -122,6 +133,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/login'
     | '/_app/access'
+    | '/_app/branding'
     | '/_app/grants'
     | '/_app/help'
     | '/_app/users'
@@ -166,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccessRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/branding': {
+      id: '/_app/branding'
+      path: '/branding'
+      fullPath: '/branding'
+      preLoaderRoute: typeof AppBrandingRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/grants': {
       id: '/_app/grants'
       path: '/grants'
@@ -206,6 +225,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAccessRoute: typeof AppAccessRoute
+  AppBrandingRoute: typeof AppBrandingRoute
   AppGrantsRoute: typeof AppGrantsRoute
   AppHelpRoute: typeof AppHelpRoute
   AppUsersRoute: typeof AppUsersRoute
@@ -215,6 +235,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAccessRoute: AppAccessRoute,
+  AppBrandingRoute: AppBrandingRoute,
   AppGrantsRoute: AppGrantsRoute,
   AppHelpRoute: AppHelpRoute,
   AppUsersRoute: AppUsersRoute,
